@@ -13,3 +13,5 @@ $ python3 bc_server.py
 ```
 
 ### Before Running this command change the database 
+
+#### After this you can connect many devices and use simple calculation!!!
