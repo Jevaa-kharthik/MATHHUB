@@ -2,6 +2,8 @@
 
 #### To use this user you need a tool called BC 
 
+#### Disclaimer: This can be used in linux distors
+
 ### To install this BC tool type this command
 ```
 $ sudo apt install bc
