@@ -1,10 +1,12 @@
 from subprocess import PIPE, Popen, STDOUT
 from threading import Thread
 import socket
-import mysql.connector
 
 HOST = ''
-PORT = 3079
+PORT = 3099
+
+# Define allowed IP addresses
+allowed_ips = set()
 
 class OutputThread(Thread):
     def __init__(self, proc, conn):
@@ -57,27 +59,8 @@ class MathServerThread(Thread):
             except Exception as e:
                 print(f"Error receiving data: {e}")
 
-def login_check(username, password, addr):
-    try:
-        mydb = mysql.connector.connect(
-            host="mysql.selfmade.ninja",
-            user="Jevaa_kharthik_n",
-            password="jicry9-saxvyb-jytWib",
-            database="Jevaa_kharthik_n_Mathserver"
-        )
-
-        mycursor = mydb.cursor()
-        sqlcheck = "SELECT username, password, ip_address FROM LoginCredentials WHERE username=%s AND password=%s AND ip_address=%s"
-        val = (username, password, addr)
-        mycursor.execute(sqlcheck, val)
-        result = mycursor.fetchone()
-        if result:
-            return True
-        else:
-            return False
-    except Exception as e:
-        print(f"Error checking login credentials: {e}")
-        return False
+def firewall_check(addr):
+    return addr[0] in allowed_ips
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -86,37 +69,10 @@ s.listen()
 
 while True:
     conn, addr = s.accept()
-    file = open("ip.txt", 'r')
-    if addr[0] in file.read():
-        file.close()
-        username = input("Enter your username: ")
-        password = input("Enter your password: ")
-        if login_check(username, password, addr[0]):
-            MathServerThread(conn, addr).start()
+    
+    if firewall_check(addr):
+        MathServerThread(conn, addr).start()
     else:
-        file.close()
-        with open("ip.txt", 'a') as f:
-            f.write(addr[0] + "\n")
-
-        username = input("Enter your username: ")
-        password = input("Enter your password: ")
-
-        mydb = mysql.connector.connect(
-            host="mysql.selfmade.ninja",
-            user="Jevaa_kharthik_n",
-            password="jicry9-saxvyb-jytWib",
-            database="Jevaa_kharthik_n_Mathserver"
-        )
-
-        mycursor = mydb.cursor()
-        sqlquery = "INSERT INTO LoginCredentials (username, password, ip_address) VALUES (%s, %s, %s)"
-        val = (username, password, addr[0])
-        mycursor.execute(sqlquery, val)
-        mydb.commit()
-
-        if login_check(username, password, addr[0]):
-            MathServerThread(conn, addr).start()
-        else:
-            print("Invalid credentials")
+        print("Access denied: Your IP address is not allowed by the firewall")
 
 s.close()
