@@ -1,19 +1,28 @@
 from subprocess import PIPE, Popen, STDOUT
 from threading import Thread
 import socket
+import logging
+from collections import defaultdict
+import time
 
 HOST = ''
 PORT = 3099
 
-# Define allowed IP addresses
-allowed_ips = set()
+THRESHOLD = 50  
+WINDOW_SIZE = 60  
+BLOCK_DURATION = 300  
+connection_counts = defaultdict(int)
+blocked_ips = set()
+
+logging.basicConfig(filename='dos.log', level=logging.INFO,
+                    format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 class OutputThread(Thread):
     def __init__(self, proc, conn):
         Thread.__init__(self)
         self.proc = proc
         self.conn = conn
-        
+
     def run(self):
         while not self.proc.stdout.closed and not self.conn._closed:
             try:
@@ -29,15 +38,15 @@ class MathServerThread(Thread):
         Thread.__init__(self)
         self.conn = conn
         self.addr = addr
-        
+
     def run(self):
         print("{} connected with the back port {}".format(self.addr[0], self.addr[1]))
         self.conn.sendall("Welcome to the MATHHUB SERVER \n Give any Mathematical Equation and Don't try to DOS or DDoS this Server \n\n Because this has firewall".encode())
-        
+
         p = Popen(['bc'], stderr=STDOUT, stdout=PIPE, stdin=PIPE, text=True)
         output = OutputThread(p, self.conn)
         output.start()
-        
+
         while not p.stdout.closed and not self.conn._closed:
             try:
                 data = self.conn.recv(1024)
@@ -60,19 +69,37 @@ class MathServerThread(Thread):
                 print(f"Error receiving data: {e}")
 
 def firewall_check(addr):
-    return addr[0] in allowed_ips
+    ip = addr[0]
+    if ip in blocked_ips:
+        return False
+    connection_counts[ip] += 1
+    if connection_counts[ip] > THRESHOLD:
+        logging.info(f'DoS attack detected from {ip}')
+        # Block the IP address
+        block_ip(ip)
+        return False
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind((HOST, PORT))
-s.listen()
+    return True
 
-while True:
-    conn, addr = s.accept()
-    
-    if firewall_check(addr):
-        MathServerThread(conn, addr).start()
-    else:
-        print("Access denied: Your IP address is not allowed by the firewall")
+def block_ip(ip):
+    blocked_ips.add(ip)
 
-s.close()
+
+def main():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((HOST, PORT))
+    s.listen()
+
+    while True:
+        conn, addr = s.accept()
+
+        if firewall_check(addr):
+            MathServerThread(conn, addr).start()
+        else:
+            print("Access denied: Your IP address is not allowed by the firewall")
+
+    s.close()
+
+if __name__ == "__main__":
+    main()
