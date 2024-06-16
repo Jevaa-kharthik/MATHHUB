@@ -5,7 +5,7 @@ import logging
 from collections import defaultdict
 import time
 
-HOST = ''
+HOST = '172.168.67.188'
 PORT = 3099
 
 THRESHOLD = 50  
